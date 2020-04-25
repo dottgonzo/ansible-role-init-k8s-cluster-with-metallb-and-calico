@@ -78,6 +78,19 @@
   tags: ['skip_ansible_lint']
   when:  kubernetes_role != 'manager'
 
+
+- name: Configure Calico networking.
+  command: "{{ item }}"
+  with_items:
+    - kubectl apply -f {{ kubernetes_calico_manifest_file }}
+  register: calico_result
+  changed_when: "'created' in calico_result.stdout"
+  when: kubernetes_pod_network.cni == 'calico'
+
+- name: Configure Calico networking.
+  command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
+
+
 - name: Wait for my-app-name pods to be ready.
   command: >
     kubectl wait --for=condition=Ready
@@ -104,3 +117,27 @@
   when:
     - kubernetes_enable_web_ui | bool
     - kubernetes_dashboard_service is failed
+
+
+- name: Install MetalLb.
+  command: "{{ item }}"
+  with_items:
+    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.3/manifests/namespace.yaml
+    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.3/manifests/metallb.yaml
+  register: mllbcreate
+
+- name: Configure MetalLb memberlist.
+  shell: 'kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"'
+  ignore_errors: yes
+
+- name: Setup k8s MetalLb
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: config
+        namespace: metallb-system
+      data:
+        config: "{{metallbpools}}"
