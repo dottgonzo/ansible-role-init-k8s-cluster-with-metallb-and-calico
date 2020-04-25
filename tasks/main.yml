@@ -96,6 +96,7 @@
 - name: Configure Calico networking.
   command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
   when: primarymaster is defined
+  changed_when: false
 
 
 - name: Check if Kubernetes Dashboard UI service already exists.
@@ -119,6 +120,7 @@
     - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.3/manifests/metallb.yaml
   register: mllbcreate
   when: primarymaster is defined
+  changed_when: false
 
 - name: Configure MetalLb memberlist.
   shell: 'kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"'
