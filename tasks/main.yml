@@ -140,4 +140,4 @@
         name: config
         namespace: metallb-system
       data:
-        config: "{{metallbpools}}"
+        config: "{{ metallbpools }}"
