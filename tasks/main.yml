@@ -1,0 +1,106 @@
+---
+
+- name: Initialize Kubernetes master with kubeadm init.
+  shell: "kubeadm init --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_node_ip }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} | grep '\\-certificate-key' | awk '{print($3)}'"
+  register: kubernetes_manager0init_command_result
+  when: primarymaster is defined
+
+
+- name: Create .kube folder
+  file:
+    path: "~{{ ansible_ssh_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_ssh_user }}"
+    group: "{{ ansible_ssh_user }}"
+  when: primarymaster is defined and kubernetes_manager0init_command_result.stdout is defined
+
+- name: Copy admin.conf to .kube folder
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "~{{ ansible_ssh_user }}/.kube/config"
+    owner: "{{ ansible_ssh_user }}"
+    group: "{{ ansible_ssh_user }}"
+    remote_src: yes
+  when: primarymaster is defined
+
+
+- name: "Add K8S Manager Token and Hash to dummy host"
+  add_host:
+    name:   "K8S_MANAGERKEY_HOLDER"
+    token: "{{ kubernetes_manager0init_command_result.stdout }}"
+    hash:
+  when: kubernetes_manager0init_command_result.stdout is defined
+
+# Set up nodes.
+- name: Get the kubeadm join command from the Kubernetes master.
+  command: kubeadm token create --print-join-command
+  changed_when: false
+  register: kubernetes_join_command_result
+  when: primarymaster is defined
+
+
+- name: "Add K8S Token and Hash to dummy host"
+  add_host:
+    name:   "K8S_TOKEN_HOLDER"
+    token: "{{ kubernetes_join_command_result.stdout }}"
+    hash:
+  when: kubernetes_join_command_result.stdout is defined
+
+
+- name: Join node to Kubernetes as master
+  shell: >
+    {{ hostvars['K8S_TOKEN_HOLDER']['token'] }} --control-plane --certificate-key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }} creates=/etc/kubernetes/kubelet.conf
+  tags: ['skip_ansible_lint']
+  when: secondarymaster is defined
+
+
+- name: Create .kube folder
+  file:
+    path: "~{{ ansible_ssh_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_ssh_user }}"
+    group: "{{ ansible_ssh_user }}"
+  when: secondarymaster is defined
+
+- name: Copy admin.conf to .kube folder
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "~{{ ansible_ssh_user }}/.kube/config"
+    owner: "{{ ansible_ssh_user }}"
+    group: "{{ ansible_ssh_user }}"
+    remote_src: yes
+  when: secondarymaster is defined
+
+- name: Join node to Kubernetes as worker
+  shell: >
+    {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}
+    creates=/etc/kubernetes/kubelet.conf
+  tags: ['skip_ansible_lint']
+  when:  kubernetes_role != 'manager'
+
+- name: Wait for my-app-name pods to be ready.
+  command: >
+    kubectl wait --for=condition=Ready
+    no --all --timeout=300s
+  changed_when: false
+  when: primarymaster is defined
+
+# TODO: Check if taint exists with something like `kubectl describe nodes`
+# instead of using kubernetes_init_stat.stat.exists check.
+- name: Allow pods on master node (if configured).
+  command: "kubectl taint nodes --all node-role.kubernetes.io/master-"
+  when:
+    - kubernetes_allow_pods_on_master | bool
+
+- name: Check if Kubernetes Dashboard UI service already exists.
+  shell: kubectl get services --namespace kube-system | grep -q kubernetes-dashboard
+  changed_when: false
+  failed_when: false
+  register: kubernetes_dashboard_service
+  when: kubernetes_enable_web_ui | bool
+
+- name: Enable the Kubernetes Web Dashboard UI (if configured).
+  command: "kubectl create -f {{ kubernetes_web_ui_manifest_file }}"
+  when:
+    - kubernetes_enable_web_ui | bool
+    - kubernetes_dashboard_service is failed

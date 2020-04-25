@@ -1,0 +1,5 @@
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - ansible-role-init-k8s-cluster-with-metallb-and-calico
