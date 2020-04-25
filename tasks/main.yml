@@ -126,6 +126,7 @@
   shell: 'kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"'
   ignore_errors: yes
   when: primarymaster is defined
+  changed_when: false
 
 - name: Setup k8s MetalLb
   k8s:
@@ -157,3 +158,4 @@
     - kubernetes_allow_pods_on_master | bool
     - primarymaster is defined
   ignore_errors: True
+  changed_when: false
