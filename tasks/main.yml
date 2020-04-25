@@ -4,6 +4,7 @@
   shell: "kubeadm init --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_node_ip }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} | grep '\\-certificate-key' | awk '{print($3)}'"
   register: kubernetes_manager0init_command_result
   when: primarymaster is defined
+  changed_when: false
 
 
 - name: Create .kube folder
@@ -30,6 +31,7 @@
     token: "{{ kubernetes_manager0init_command_result.stdout }}"
     hash:
   when: kubernetes_manager0init_command_result.stdout is defined
+  changed_when: false
 
 # Set up nodes.
 - name: Get the kubeadm join command from the Kubernetes master.
@@ -45,6 +47,7 @@
     token: "{{ kubernetes_join_command_result.stdout }}"
     hash:
   when: kubernetes_join_command_result.stdout is defined
+  changed_when: false
 
 
 - name: Join node to Kubernetes as master
@@ -84,7 +87,8 @@
   with_items:
     - kubectl apply -f {{ kubernetes_calico_manifest_file }}
   register: calico_result
-  changed_when: "'created' in calico_result.stdout"
+  # changed_when: "'created' in calico_result.stdout"
+  changed_when: false
   when: 
     - kubernetes_pod_network.cni == 'calico'
     - primarymaster is defined
