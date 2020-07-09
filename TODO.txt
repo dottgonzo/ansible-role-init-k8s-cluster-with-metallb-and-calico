@@ -1,0 +1,2 @@
+ - fix join to cluster when master is just present (token is not set)
+ 

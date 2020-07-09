@@ -1,7 +1,7 @@
 ---
 
 - name: Initialize Kubernetes master with kubeadm init.
-  shell: "kubeadm init --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_node_ip }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} | grep '\\-certificate-key' | awk '{print($3)}'"
+  shell: "kubeadm init --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address=0.0.0.0 --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} | grep '\\-certificate-key' | awk '{print($3)}'"
   register: kubernetes_manager0init_command_result
   when: primarymanager is defined
   changed_when: false
