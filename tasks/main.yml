@@ -57,6 +57,14 @@
   when: secondarymaster is defined
 
 
+
+- name: Join node to Kubernetes as worker
+  shell: >
+    {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}
+    creates=/etc/kubernetes/kubelet.conf
+  tags: ['skip_ansible_lint']
+  when:  kubernetes_role != 'manager'
+
 - name: Create .kube folder
   file:
     path: "~{{ ansible_ssh_user }}/.kube"
@@ -73,13 +81,6 @@
     group: "{{ ansible_ssh_user }}"
     remote_src: yes
   when: secondarymaster is defined
-
-- name: Join node to Kubernetes as worker
-  shell: >
-    {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}
-    creates=/etc/kubernetes/kubelet.conf
-  tags: ['skip_ansible_lint']
-  when:  kubernetes_role != 'manager'
 
 
 - name: Configure Calico networking.
@@ -113,11 +114,22 @@
     - kubernetes_dashboard_service is failed
 
 
+
+
+
+
+- name: Configure kubectl proxy
+  shell: "kubectl get configmap kube-proxy -n kube-system -o yaml | sed -e 's/strictARP: false/strictARP: true/' | kubectl apply -f - -n kube-system"
+  when: primarymanager is defined
+  args:
+    executable: /bin/bash
+ 
+ 
 - name: Install MetalLb.
   command: "{{ item }}"
   with_items:
-    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.3/manifests/namespace.yaml
-    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.3/manifests/metallb.yaml
+    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.5/manifests/namespace.yaml
+    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.5/manifests/metallb.yaml
   register: mllbcreate
   when: primarymanager is defined
   changed_when: false
