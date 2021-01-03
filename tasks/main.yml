@@ -109,12 +109,12 @@
   changed_when: false
   failed_when: false
   register: kubernetes_dashboard_service
-  when: kubernetes_enable_web_ui | bool
+  when: kubernetes_enable_web_ui is defined
 
 - name: Enable the Kubernetes Web Dashboard UI (if configured).
   command: "kubectl create -f {{ kubernetes_web_ui_manifest_file }}"
   when:
-    - kubernetes_enable_web_ui | bool
+    - kubernetes_enable_web_ui is defined
     - kubernetes_dashboard_service is failed
 
 
