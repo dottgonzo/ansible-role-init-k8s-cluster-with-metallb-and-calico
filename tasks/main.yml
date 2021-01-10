@@ -1,14 +1,16 @@
 ---
-
-
-
 - name: Initialize Kubernetes master with kubeadm init.
-  shell: "kubeadm init --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_server_advertise_address | default('0.0.0.0') }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} {{ '--apiserver-cert-extra-sans='+apiserver_cert_extra_sans if apiserver_cert_extra_sans is defined }} | grep '\\-certificate-key' | awk '{print($3)}'"
+  shell: 'kubeadm init --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_server_advertise_address | default("0.0.0.0") }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} {{ "--apiserver-cert-extra-sans="+apiserver_cert_extra_sans if apiserver_cert_extra_sans is defined }} | grep certificate-key | grep control-plane | sed "s/.*certificate-key//" | sed "s/ //g"|sed "s/\\\//g"'
   register: kubernetes_manager0init_command_result
   changed_when: false
   when:
     - primarymanager is defined
 
+- name: Debug token
+  debug:
+    msg: "{{kubernetes_manager0init_command_result.stdout}}"
+
+  when: primarymanager is defined and kubernetes_manager0init_command_result.stdout is defined
 
 - name: Create .kube folder
   file:
@@ -27,10 +29,9 @@
     remote_src: yes
   when: primarymanager is defined
 
-
 - name: "Add K8S Manager Token and Hash to dummy host"
   add_host:
-    name:   "K8S_MANAGERKEY_HOLDER"
+    name: "K8S_MANAGERKEY_HOLDER"
     token: "{{ kubernetes_manager0init_command_result.stdout }}"
     hash:
   when: kubernetes_manager0init_command_result.stdout is defined
@@ -43,30 +44,26 @@
   register: kubernetes_join_command_result
   when: primarymanager is defined
 
-
 - name: "Add K8S Token and Hash to dummy host"
   add_host:
-    name:   "K8S_TOKEN_HOLDER"
+    name: "K8S_TOKEN_HOLDER"
     token: "{{ kubernetes_join_command_result.stdout }}"
     hash:
   when: kubernetes_join_command_result.stdout is defined
   changed_when: false
 
-
 - name: Join node to Kubernetes as master
   shell: >
     {{ hostvars['K8S_TOKEN_HOLDER']['token'] }} --control-plane --certificate-key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }} creates=/etc/kubernetes/kubelet.conf
-  tags: ['skip_ansible_lint']
+  tags: ["skip_ansible_lint"]
   when: secondarymaster is defined
-
-
 
 - name: Join node to Kubernetes as worker
   shell: >
     {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}
     creates=/etc/kubernetes/kubelet.conf
-  tags: ['skip_ansible_lint']
-  when:  kubernetes_role != 'manager'
+  tags: ["skip_ansible_lint"]
+  when: kubernetes_role != 'manager'
 
 - name: Create .kube folder
   file:
@@ -85,7 +82,6 @@
     remote_src: yes
   when: secondarymaster is defined
 
-
 - name: Configure Calico networking.
   command: "{{ item }}"
   with_items:
@@ -93,19 +89,18 @@
   register: calico_result
   # changed_when: "'created' in calico_result.stdout"
   changed_when: false
-  when: 
+  when:
     - kubernetes_pod_network.cni == 'calico'
     - primarymanager is defined
     - kubernetes_calico_manifest_file is defined
 
 - name: Configure Calico networking.
   command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
-  when: 
+  when:
     - kubernetes_pod_network.cni == 'calico'
     - primarymanager is defined
     - kubernetes_calico_manifest_file is defined
   changed_when: false
-
 
 - name: Check if Kubernetes Dashboard UI service already exists.
   shell: kubectl get services --namespace kube-system | grep -q kubernetes-dashboard
@@ -120,54 +115,12 @@
     - kubernetes_enable_web_ui is defined
     - kubernetes_dashboard_service is failed
 
-
-
-
-
-
 - name: Configure kubectl proxy
   shell: "kubectl get configmap kube-proxy -n kube-system -o yaml | sed -e 's/strictARP: false/strictARP: true/' | kubectl apply -f - -n kube-system"
   when: primarymanager is defined
   args:
     executable: /bin/bash
- 
- 
-- name: Install MetalLb.
-  command: "{{ item }}"
-  with_items:
-    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.5/manifests/namespace.yaml
-    - kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.9.5/manifests/metallb.yaml
-  register: mllbcreate
-  when: primarymanager is defined
-  changed_when: false
 
-- name: Configure MetalLb memberlist.
-  shell: 'kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"'
-  ignore_errors: yes
-  when: primarymanager is defined
-  changed_when: false
-
-- name: Setup k8s MetalLb
-  k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: config
-        namespace: metallb-system
-      data:
-        config: "{{ metallbpools }}"
-  when: primarymanager is defined
-
-
-
-
-- name: Wait for my-app-name pods to be ready.
-  command: |
-    kubectl wait --for=condition=Ready no --all --timeout=300s
-  changed_when: false
-  when: primarymanager is defined
 
 # TODO: Check if taint exists with something like `kubectl describe nodes`
 # instead of using kubernetes_init_stat.stat.exists check.
@@ -178,3 +131,11 @@
     - primarymanager is defined
   ignore_errors: True
   changed_when: false
+
+
+
+- name: Wait for my-app-name pods to be ready.
+  command: |
+    kubectl wait --for=condition=Ready no --all --timeout=300s
+  changed_when: false
+  when: primarymanager is defined
