@@ -52,6 +52,11 @@
   when: kubernetes_join_command_result.stdout is defined
   changed_when: false
 
+- name: Debug secondary
+  debug: 
+    msg: "Joining with {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}"
+  when: secondarymaster is defined
+
 - name: Join node to Kubernetes as master
   shell: >
     {{ hostvars['K8S_TOKEN_HOLDER']['token'] }} --control-plane --certificate-key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }} creates=/etc/kubernetes/kubelet.conf
