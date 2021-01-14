@@ -10,7 +10,8 @@
   debug:
     msg: "{{kubernetes_manager0init_command_result.stdout}}"
 
-  when: primarymanager is defined and kubernetes_manager0init_command_result.stdout is defined
+  when: 
+    - primarymanager is defined and kubernetes_manager0init_command_result.stdout is defined
 
 - name: Create .kube folder
   file:
@@ -18,7 +19,8 @@
     state: directory
     owner: "{{ ansible_ssh_user }}"
     group: "{{ ansible_ssh_user }}"
-  when: primarymanager is defined and kubernetes_manager0init_command_result.stdout is defined
+  when: 
+    - primarymanager is defined and kubernetes_manager0init_command_result.stdout is defined
 
 - name: Copy admin.conf to .kube folder
   copy:
@@ -27,14 +29,16 @@
     owner: "{{ ansible_ssh_user }}"
     group: "{{ ansible_ssh_user }}"
     remote_src: yes
-  when: primarymanager is defined
+  when: 
+    - primarymanager is defined
 
 - name: "Add K8S Manager Token and Hash to dummy host"
   add_host:
     name: "K8S_MANAGERKEY_HOLDER"
     token: "{{ kubernetes_manager0init_command_result.stdout }}"
     hash:
-  when: kubernetes_manager0init_command_result.stdout is defined
+  when: 
+    - kubernetes_manager0init_command_result.stdout is defined
   changed_when: false
 
 # Set up nodes.
@@ -42,7 +46,8 @@
   command: kubeadm token create --print-join-command
   changed_when: false
   register: kubernetes_join_command_result
-  when: primarymanager is defined
+  when: 
+    - primarymanager is defined
 
 - name: "Add K8S Token and Hash to dummy host"
   add_host:
