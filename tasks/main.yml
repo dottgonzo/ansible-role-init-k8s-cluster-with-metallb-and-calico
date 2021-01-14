@@ -1,6 +1,6 @@
 ---
 - name: Initialize Kubernetes master with kubeadm init.
-  shell: 'kubeadm init {{ "control-plane-endpoint \"" + kubernetes_loadbalancer_k8sapi_uri + "\"" if kubernetes_loadbalancer_k8sapi_uri is defined }} --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_server_advertise_address | default("0.0.0.0") }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} {{ "--apiserver-cert-extra-sans="+apiserver_cert_extra_sans if apiserver_cert_extra_sans is defined }} | grep certificate-key | grep control-plane | sed "s/.*certificate-key//" | sed "s/ //g"|sed "s/\\\//g"'
+  shell: 'kubeadm init {{ "control-plane-endpoint " + kubernetes_loadbalancer_k8sapi_uri if kubernetes_loadbalancer_k8sapi_uri is defined }} --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_server_advertise_address | default("0.0.0.0") }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_node_ip }} {{ "--apiserver-cert-extra-sans="+apiserver_cert_extra_sans if apiserver_cert_extra_sans is defined }} | grep certificate-key | grep control-plane | sed "s/.*certificate-key//" | sed "s/ //g"|sed "s/\\\//g"'
   register: kubernetes_manager0init_command_result
   changed_when: false
   when:
