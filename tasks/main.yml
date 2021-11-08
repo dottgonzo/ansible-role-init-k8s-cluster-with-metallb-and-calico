@@ -40,6 +40,28 @@
   when: 
     - primarymanager is defined
 
+
+- name: Configure Calico networking.
+  command: "{{ item }}"
+  with_items:
+    - kubectl apply -f {{ kubernetes_calico_manifest_file }}
+  register: calico_result
+  # changed_when: "'created' in calico_result.stdout"
+  changed_when: false
+  when:
+    - kubernetes_pod_network.cni == 'calico'
+    - primarymanager is defined
+    - kubernetes_calico_manifest_file is defined
+
+- name: Configure Calico networking.
+  command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
+  when:
+    - kubernetes_pod_network.cni == 'calico'
+    - primarymanager is defined
+    - kubernetes_calico_manifest_file is defined
+  changed_when: false
+
+
 - name: "Add K8S Manager Token and Hash to dummy host"
   add_host:
     name: "K8S_MANAGERKEY_HOLDER"
@@ -100,25 +122,6 @@
     remote_src: yes
   when: secondarymaster is defined
 
-- name: Configure Calico networking.
-  command: "{{ item }}"
-  with_items:
-    - kubectl apply -f {{ kubernetes_calico_manifest_file }}
-  register: calico_result
-  # changed_when: "'created' in calico_result.stdout"
-  changed_when: false
-  when:
-    - kubernetes_pod_network.cni == 'calico'
-    - primarymanager is defined
-    - kubernetes_calico_manifest_file is defined
-
-- name: Configure Calico networking.
-  command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
-  when:
-    - kubernetes_pod_network.cni == 'calico'
-    - primarymanager is defined
-    - kubernetes_calico_manifest_file is defined
-  changed_when: false
 
 - name: Check if Kubernetes Dashboard UI service already exists.
   shell: kubectl get services --namespace kube-system | grep -q kubernetes-dashboard
