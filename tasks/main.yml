@@ -72,7 +72,7 @@
 
 - name: Join node to Kubernetes as master
   shell: >
-    {{ hostvars['K8S_TOKEN_HOLDER']['token'] }} --apiserver-advertise-address={{ kubernetes_node_ip | default("0.0.0.0") }} --control-plane --certificate-key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }} creates=/etc/kubernetes/kubelet.conf
+    {{ hostvars['K8S_TOKEN_HOLDER']['token'] }} --control-plane --certificate-key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }} creates=/etc/kubernetes/kubelet.conf
   tags: ["skip_ansible_lint"]
   when: secondarymaster is defined
 
