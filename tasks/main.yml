@@ -140,6 +140,16 @@
     executable: /bin/bash
 
 
+- name: Allow pods on master node (if configured).
+  command: "kubectl taint nodes --all node-role.kubernetes.io/master-"
+  when:
+    - kubernetes_allow_pods_on_master is defined
+    - primarymanager is defined
+  ignore_errors: True
+  changed_when: false
+
+
+
 - name: Install MetalLb.
   command: "{{ item }}"
   with_items:
