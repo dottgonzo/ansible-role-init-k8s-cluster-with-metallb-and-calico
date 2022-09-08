@@ -184,3 +184,11 @@
     kubectl wait --for=condition=Ready no --all --timeout=300s
   changed_when: false
   when: primarymanager is defined
+
+- name: Allow pods on master node (if configured) for compatibility.
+  command: "kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule-"
+  when:
+    - kubernetes_allow_pods_on_master is defined
+    - primarymanager is defined
+  ignore_errors: True
+  changed_when: false
