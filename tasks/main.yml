@@ -5,13 +5,18 @@
 #     # | grep certificate-key | grep control-plane | sed "s/.*certificate-key//" | sed "s/ //g"|sed "s/\\\//g"'
 #   when: 
 #     - primarymanager is defined
-
+- name: Task name
+  stat:
+    path: "~{{ ansible_ssh_user }}/.kube"
+  register: kube_folder_check
 
 - name: Initialize Kubernetes master with kubeadm init.
   shell: 'kubeadm init --pod-network-cidr={{ kubernetes_pod_network.cidr }} --apiserver-advertise-address={{ kubernetes_server_advertise_address | default("0.0.0.0") }} --ignore-preflight-errors={{ kubernetes_ignore_preflight_errors }} --upload-certs --control-plane-endpoint={{ kubernetes_control_plane_endpoint }} {{ "--apiserver-cert-extra-sans="+apiserver_cert_extra_sans if apiserver_cert_extra_sans is defined }}'
   changed_when: false
   when:
     - primarymanager is defined
+    - not register_name.stat.exists
+
 
 
 - name: Create .kube folder
@@ -22,6 +27,7 @@
     group: "{{ ansible_ssh_user }}"
   when: 
     - primarymanager is defined
+    - not register_name.stat.exists
 
 - name: Copy admin.conf to .kube folder
   copy:
@@ -32,6 +38,7 @@
     remote_src: yes
   when: 
     - primarymanager is defined
+    - not register_name.stat.exists
 
 # Set up nodes.
 - name: Get the kubeadm join command from the Kubernetes master.
@@ -40,13 +47,16 @@
   register: kubernetes_join_command_result
   when: 
     - primarymanager is defined
+    - not register_name.stat.exists
 
 - name: "Add K8S Token and Hash to dummy host"
   add_host:
     name: "K8S_TOKEN_HOLDER"
     token: "{{ kubernetes_join_command_result.stdout }}"
     hash:
-  when: kubernetes_join_command_result.stdout is defined
+  when: 
+    - kubernetes_join_command_result.stdout is defined
+    - not register_name.stat.exists
   changed_when: false
 
 - name: Get the kubeadm join command from the Kubernetes master.
@@ -55,6 +65,7 @@
   register: kubeadm_cert_key
   when: 
     - primarymanager is defined
+    - not register_name.stat.exists
 
 - name: "Add K8S Manager Token and Hash to dummy host"
   add_host:
@@ -62,31 +73,40 @@
     token: "{{kubeadm_cert_key.stdout_lines[2]}}"
     hash:
   changed_when: false
-
+  when: 
+    - not register_name.stat.exists
 
 - name: Debug secondary
   debug: 
     msg: "Joining with {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}"
-  when: secondarymaster is defined
+  when: 
+    - secondarymaster is defined
+    - not register_name.stat.exists
 
 - name: Debug certificate key
   debug: 
     msg: "certificate key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }}"
-  when: secondarymaster is defined
+  when: 
+    - secondarymaster is defined
+    - not register_name.stat.exists
 
 
 - name: Join node to Kubernetes as master
   shell: >
     {{ hostvars['K8S_TOKEN_HOLDER']['token'] }} --control-plane --certificate-key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }} creates=/etc/kubernetes/kubelet.conf
   tags: ["skip_ansible_lint"]
-  when: secondarymaster is defined
+  when: 
+    - secondarymaster is defined
+    - not register_name.stat.exists
 
 - name: Join node to Kubernetes as worker
   shell: >
     {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}
     creates=/etc/kubernetes/kubelet.conf
   tags: ["skip_ansible_lint"]
-  when: kubernetes_role != 'manager'
+  when: 
+    - kubernetes_role != 'manager'
+    - not register_name.stat.exists
 
 - name: Create .kube folder
   file:
@@ -94,7 +114,10 @@
     state: directory
     owner: "{{ ansible_ssh_user }}"
     group: "{{ ansible_ssh_user }}"
-  when: secondarymaster is defined
+  when: 
+    - secondarymaster is defined
+    - not register_name.stat.exists
+
 
 - name: Copy admin.conf to .kube folder
   copy:
@@ -103,7 +126,9 @@
     owner: "{{ ansible_ssh_user }}"
     group: "{{ ansible_ssh_user }}"
     remote_src: yes
-  when: secondarymaster is defined
+  when: 
+    - secondarymaster is defined
+    - not register_name.stat.exists
 
 - name: Configure Calico networking.
   command: "{{ item }}"
@@ -116,6 +141,7 @@
     - kubernetes_pod_network.cni == 'calico'
     - primarymanager is defined
     - kubernetes_calico_manifest_file is defined
+    - not register_name.stat.exists
 
 - name: Configure Calico networking.
   command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
@@ -123,6 +149,7 @@
     - kubernetes_pod_network.cni == 'calico'
     - primarymanager is defined
     - kubernetes_calico_manifest_file is defined
+    - not register_name.stat.exists
   changed_when: false
 
 - name: Check if Kubernetes Dashboard UI service already exists.
@@ -130,17 +157,22 @@
   changed_when: false
   failed_when: false
   register: kubernetes_dashboard_service
-  when: kubernetes_enable_web_ui is defined
+  when: 
+    - kubernetes_enable_web_ui is defined
+    - not register_name.stat.exists
 
 - name: Enable the Kubernetes Web Dashboard UI (if configured).
   command: "kubectl create -f {{ kubernetes_web_ui_manifest_file }}"
   when:
     - kubernetes_enable_web_ui is defined
     - kubernetes_dashboard_service is failed
+    - not register_name.stat.exists
 
 - name: Configure kubectl proxy
   shell: "kubectl get configmap kube-proxy -n kube-system -o yaml | sed -e 's/strictARP: false/strictARP: true/' | kubectl apply -f - -n kube-system"
-  when: primarymanager is defined
+  when: 
+    - primarymanager is defined
+    - not register_name.stat.exists
   args:
     executable: /bin/bash
 
@@ -155,6 +187,7 @@
   when: 
     - primarymanager is defined
     - metallbpools is defined
+    - not register_name.stat.exists
 
 - name: Configure MetalLb memberlist.
   shell: 'kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"'
@@ -163,6 +196,7 @@
   when: 
     - primarymanager is defined
     - metallbpools is defined
+    - not register_name.stat.exists
 
 - name: Setup k8s MetalLb
   k8s:
@@ -178,17 +212,22 @@
   when: 
     - primarymanager is defined
     - metallbpools is defined
+    - not register_name.stat.exists
 
 - name: Wait for my-app-name pods to be ready.
   command: |
     kubectl wait --for=condition=Ready no --all --timeout=300s
   changed_when: false
-  when: primarymanager is defined
+  when: 
+    - primarymanager is defined
+    - not register_name.stat.exists
+
 
 - name: Allow pods on master node (if configured) for compatibility.
   command: "kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule-"
   when:
     - kubernetes_allow_pods_on_master is defined
     - primarymanager is defined
+    - not register_name.stat.exists
   ignore_errors: True
   changed_when: false
