@@ -15,7 +15,7 @@
   changed_when: false
   when:
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 
 
@@ -27,7 +27,7 @@
     group: "{{ ansible_ssh_user }}"
   when: 
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Copy admin.conf to .kube folder
   copy:
@@ -38,7 +38,7 @@
     remote_src: yes
   when: 
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 # Set up nodes.
 - name: Get the kubeadm join command from the Kubernetes master.
@@ -47,7 +47,7 @@
   register: kubernetes_join_command_result
   when: 
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: "Add K8S Token and Hash to dummy host"
   add_host:
@@ -56,7 +56,7 @@
     hash:
   when: 
     - kubernetes_join_command_result.stdout is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
   changed_when: false
 
 - name: Get the kubeadm join command from the Kubernetes master.
@@ -65,7 +65,7 @@
   register: kubeadm_cert_key
   when: 
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: "Add K8S Manager Token and Hash to dummy host"
   add_host:
@@ -74,21 +74,21 @@
     hash:
   changed_when: false
   when: 
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Debug secondary
   debug: 
     msg: "Joining with {{ hostvars['K8S_TOKEN_HOLDER']['token'] }}"
   when: 
     - secondarymaster is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Debug certificate key
   debug: 
     msg: "certificate key {{ hostvars['K8S_MANAGERKEY_HOLDER']['token'] }}"
   when: 
     - secondarymaster is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 
 - name: Join node to Kubernetes as master
@@ -97,7 +97,7 @@
   tags: ["skip_ansible_lint"]
   when: 
     - secondarymaster is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Join node to Kubernetes as worker
   shell: >
@@ -106,7 +106,7 @@
   tags: ["skip_ansible_lint"]
   when: 
     - kubernetes_role != 'manager'
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Create .kube folder
   file:
@@ -116,7 +116,7 @@
     group: "{{ ansible_ssh_user }}"
   when: 
     - secondarymaster is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 
 - name: Copy admin.conf to .kube folder
@@ -128,7 +128,7 @@
     remote_src: yes
   when: 
     - secondarymaster is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Configure Calico networking.
   command: "{{ item }}"
@@ -141,7 +141,7 @@
     - kubernetes_pod_network.cni == 'calico'
     - primarymanager is defined
     - kubernetes_calico_manifest_file is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Configure Calico networking.
   command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
@@ -149,7 +149,7 @@
     - kubernetes_pod_network.cni == 'calico'
     - primarymanager is defined
     - kubernetes_calico_manifest_file is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
   changed_when: false
 
 - name: Check if Kubernetes Dashboard UI service already exists.
@@ -159,20 +159,20 @@
   register: kubernetes_dashboard_service
   when: 
     - kubernetes_enable_web_ui is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Enable the Kubernetes Web Dashboard UI (if configured).
   command: "kubectl create -f {{ kubernetes_web_ui_manifest_file }}"
   when:
     - kubernetes_enable_web_ui is defined
     - kubernetes_dashboard_service is failed
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Configure kubectl proxy
   shell: "kubectl get configmap kube-proxy -n kube-system -o yaml | sed -e 's/strictARP: false/strictARP: true/' | kubectl apply -f - -n kube-system"
   when: 
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
   args:
     executable: /bin/bash
 
@@ -187,7 +187,7 @@
   when: 
     - primarymanager is defined
     - metallbpools is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Configure MetalLb memberlist.
   shell: 'kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"'
@@ -196,7 +196,7 @@
   when: 
     - primarymanager is defined
     - metallbpools is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Setup k8s MetalLb
   k8s:
@@ -212,7 +212,7 @@
   when: 
     - primarymanager is defined
     - metallbpools is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 - name: Wait for my-app-name pods to be ready.
   command: |
@@ -220,7 +220,7 @@
   changed_when: false
   when: 
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
 
 
 - name: Allow pods on master node (if configured) for compatibility.
@@ -228,6 +228,6 @@
   when:
     - kubernetes_allow_pods_on_master is defined
     - primarymanager is defined
-    - not register_name.stat.exists
+    - not kube_folder_check.stat.exists
   ignore_errors: True
   changed_when: false
