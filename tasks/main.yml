@@ -231,3 +231,20 @@
     - not kube_folder_check.stat.exists
   ignore_errors: True
   changed_when: false
+
+- name: Install wireguard on nodes
+  apt:
+    name: 
+      - wireguard
+      - wireguard-tools
+    state: present
+    update_cache: true
+
+- name: Patch calico
+  shell: |
+    kubectl patch felixconfiguration default --type='merge' -p '{"spec":{"wireguardEnabled":true}}'
+  args:
+    executable: /bin/bash
+  when:
+    - kubernetes_role == "master"
+  run_once: true
