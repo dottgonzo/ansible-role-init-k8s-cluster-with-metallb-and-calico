@@ -246,5 +246,5 @@
     executable: /bin/bash
   when:
     - primarymanager is defined
-    - primarymanager is defined
+    - not kube_folder_check.stat.exists
   run_once: true
