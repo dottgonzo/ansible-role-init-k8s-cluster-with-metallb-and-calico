@@ -63,13 +63,15 @@
   register: kubeadm_cert_key
   when: 
     - primarymanager is defined
-    - not kube_folder_check.stat.exists
+
 
 - name: "Add K8S Manager Token and Hash to dummy host"
   add_host:
     name: "K8S_MANAGERKEY_HOLDER"
     token: "{{kubeadm_cert_key.stdout_lines[2]}}"
     hash:
+  when: 
+    - primarymanager is defined
   changed_when: false
 
 
