@@ -142,19 +142,6 @@
     - kubernetes_calico_manifest_file is defined
     - not kube_folder_check.stat.exists
 
-- name: Configure Calico networking.
-  command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true IP_AUTODETECTION_METHOD=can-reach=8.8.8.8
-  when:
-    - kubernetes_pod_network.cni == 'calico'
-    - primarymanager is defined
-    - kubernetes_calico_manifest_file is defined
-    - not kube_folder_check.stat.exists
-  register: result
-  retries: 10
-  delay: 20
-  until: result|succeeded
-
-  changed_when: false
 
 - name: Check if Kubernetes Dashboard UI service already exists.
   shell: kubectl get services --namespace kube-system | grep -q kubernetes-dashboard
@@ -227,6 +214,20 @@
   when: 
     - primarymanager is defined
     - not kube_folder_check.stat.exists
+
+- name: Configure Calico networking.
+  command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true IP_AUTODETECTION_METHOD=can-reach=8.8.8.8
+  when:
+    - kubernetes_pod_network.cni == 'calico'
+    - primarymanager is defined
+    - kubernetes_calico_manifest_file is defined
+    - not kube_folder_check.stat.exists
+  register: result
+  retries: 10
+  delay: 20
+  until: result|succeeded
+
+
 
 
 - name: Allow pods on master node (if configured) for compatibility.
