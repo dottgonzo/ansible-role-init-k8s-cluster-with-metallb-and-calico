@@ -149,6 +149,11 @@
     - primarymanager is defined
     - kubernetes_calico_manifest_file is defined
     - not kube_folder_check.stat.exists
+  register: result
+  retries: 10
+  delay: 20
+  until: result is not failed
+
   changed_when: false
 
 - name: Check if Kubernetes Dashboard UI service already exists.
