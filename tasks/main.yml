@@ -215,19 +215,6 @@
     - primarymanager is defined
     - not kube_folder_check.stat.exists
 
-- name: Configure Calico networking.
-  command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true IP_AUTODETECTION_METHOD=can-reach=8.8.8.8
-  when:
-    - kubernetes_pod_network.cni == 'calico'
-    - primarymanager is defined
-    - kubernetes_calico_manifest_file is defined
-    - not kube_folder_check.stat.exists
-  register: result
-  retries: 10
-  delay: 20
-  until: result|succeeded
-
-
 
 
 - name: Allow pods on master node (if configured) for compatibility.
@@ -246,6 +233,23 @@
       - wireguard-tools
     state: present
     update_cache: true
+
+
+
+- name: Configure Calico networking.
+  command: kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true IP_AUTODETECTION_METHOD=can-reach=8.8.8.8
+  when:
+    - kubernetes_pod_network.cni == 'calico'
+    - primarymanager is defined
+    - kubernetes_calico_manifest_file is defined
+    - not kube_folder_check.stat.exists
+  register: result
+  retries: 10
+  delay: 20
+  until: result is not failed
+
+
+
 
 - name: Patch calico
   shell: |
